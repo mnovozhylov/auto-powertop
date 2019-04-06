@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# battery discharge checker
+
+ss=30 # sleep seconds between checks
+barrier=98 # apply command if discharging barrier goes below this battery state, in %
+command="sudo /opt/powertop/src/powertop --auto-tune"
+nmessage="Battery reached the barrier %s%%. Applying Powertop!"
+expiretime=5 # expire time for the notification message
+
+flag=true
+while true; do
+  upower=$(upower -i /org/freedesktop/UPower/devices/battery_BAT0)
+  state=$(echo "$upower" |grep 'state'|awk '{print($2)}')
+  percentage=$(echo "$upower" |grep 'percentage'|awk '{print($2)}'|sed 's/%//')
+
+  # reset flag, laptop is recharging
+  if [ $flag != "true" ] && [ "$state" == "charging" ]
+  then
+    flag=true
+  fi
+
+  # apply command
+  if [ "$percentage" -lt "$barrier" ] && [ "$state" == "discharging" ] && [ $flag == "true" ]
+  then
+    message=$(printf "$nmessage" "$percentage")
+    notify-send -t $expiretime -u low "$message"
+    `$command`
+    flag=false
+  fi
+
+ sleep $ss
+done
